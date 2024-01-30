@@ -13,3 +13,38 @@ pip install transformers accelerate
 # For pytorch/cuda(triton):
 pip install torch torchvision torchaudio
 ```
+
+# Prepare an env for Pytorch/XLA
+
+
+If using Ubuntu 22.04, `nvidia-cuda-toolkit` is too old. Follow instructions at https://developer.nvidia.com/cuda-12-1-0-download-archive to get the latest cuda package.
+
+
+```sh
+pip install https://storage.googleapis.com/pytorch-xla-releases/wheels/cuda/12.1/torch_xla-2.1.0-cp310-cp310-manylinux_2_28_x86_64.whl
+```
+
+```sh
+python -m venv ~/Dev/venv/hf-xla
+source ~/Dev/venv/hf-xla/bin/activate
+pip install transformers accelerate
+# For pytorch
+pip install torch
+# For pytorch_xla, take the package with installed CUDA, see https://github.com/pytorch/xla/blob/master/docs/gpu.md
+pip install https://storage.googleapis.com/pytorch-xla-releases/wheels/cuda/12.1/torch_xla-2.1.0-cp310-cp310-manylinux_2_28_x86_64.whl
+
+```
+
+Once you've done that, it is possible to verify that the XLA device works correctly:
+
+```python
+import os
+os.environ['PJRT_DEVICE']='GPU'
+import torch
+import torch_xla.core.xla_model as xm
+
+t = torch.randn(2, 2, device=xm.xla_device())
+print(t)
+```
+
+It is possible to modify other tests and set the `PJRT_DEVICE` environment variable and set the device: `device = xm.xla_device()` to perform the inference (tested only with distilbert, other tests might need more changes).
