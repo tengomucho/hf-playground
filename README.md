@@ -21,10 +21,6 @@ If using Ubuntu 22.04, `nvidia-cuda-toolkit` is too old. Follow instructions at 
 
 
 ```sh
-pip install https://storage.googleapis.com/pytorch-xla-releases/wheels/cuda/12.1/torch_xla-2.1.0-cp310-cp310-manylinux_2_28_x86_64.whl
-```
-
-```sh
 python -m venv ~/Dev/venv/hf-xla
 source ~/Dev/venv/hf-xla/bin/activate
 pip install transformers accelerate
@@ -48,3 +44,17 @@ print(t)
 ```
 
 It is possible to modify other tests and set the `PJRT_DEVICE` environment variable and set the device: `device = xm.xla_device()` to perform the inference (tested only with distilbert, other tests might need more changes).
+
+# Prepare a simple venv for Flax/JAX with CUDA
+
+Make sure you are using a recent CUDA toolkit as mentioned before. To install Flax and JAX:
+
+```sh
+python -m venv ~/Dev/venv/hf-flax
+source ~/Dev/venv/hf-flax/bin/activate
+pip install transformers accelerate
+# Install JAX with cuda
+pip install -U "jax[cuda12_pip]" -f https://storage.googleapis.com/jax-releases/jax_cuda_releases.html
+# Install flax
+pip install flax
+```
