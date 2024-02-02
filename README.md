@@ -21,13 +21,14 @@ If using Ubuntu 22.04, `nvidia-cuda-toolkit` is too old. Follow instructions at 
 
 
 ```sh
+export TORCH_VERSION=2.2.0
 python -m venv ~/Dev/venv/hf-xla
 source ~/Dev/venv/hf-xla/bin/activate
 pip install transformers accelerate
 # For pytorch
-pip install torch
+pip install torch==$TORCH_VERSION
 # For pytorch_xla, take the package with installed CUDA, see https://github.com/pytorch/xla/blob/master/docs/gpu.md
-pip install https://storage.googleapis.com/pytorch-xla-releases/wheels/cuda/12.1/torch_xla-2.1.0-cp310-cp310-manylinux_2_28_x86_64.whl
+pip install https://storage.googleapis.com/pytorch-xla-releases/wheels/cuda/12.1/torch_xla-$TORCH_VERSION-cp310-cp310-manylinux_2_28_x86_64.whl
 
 ```
 
@@ -35,7 +36,7 @@ Once you've done that, it is possible to verify that the XLA device works correc
 
 ```python
 import os
-os.environ['PJRT_DEVICE']='GPU'
+os.environ['PJRT_DEVICE']='CUDA'
 import torch
 import torch_xla.core.xla_model as xm
 
