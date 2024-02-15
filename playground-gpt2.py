@@ -22,11 +22,11 @@ encoded_input.to(device)
 # from transformers import set_seed
 # set_seed(42)
 model = GPT2LMHeadModel.from_pretrained('gpt2')
-model = model.eval()
 model.to(device)
+model = model.eval()
 model.generation_config.update(do_sample=True, max_length=50)
 
-output = model.generate(**encoded_input)
+output = model.generate(**encoded_input, pad_token_id=tokenizer.eos_token_id)
 generated_sequence = output.cpu().numpy().tolist()
 decoded = tokenizer.batch_decode(generated_sequence, skip_special_tokens=True, clean_up_tokenization_spaces=True)
 print(decoded[0])
