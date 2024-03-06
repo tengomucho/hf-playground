@@ -6,10 +6,14 @@ checkpoint = "distilbert-base-uncased-finetuned-sst-2-english"
 tokenizer = AutoTokenizer.from_pretrained(checkpoint)
 
 # Set the device to cuda or MPS if available
-device = "cuda" if torch.cuda.is_available() else "cpu"
-# device = torch.device('mps' if torch.backends.mps.is_available() else 'cpu')
+device = 'cpu'
+if torch.cuda.is_available():
+    device = 'cuda'
+elif torch.backends.mps.is_available():
+    device = 'mps'
+
 if device == 'cpu':
-    raise RuntimeError("where's cuda? :( ")
+    raise RuntimeError("where's hw (cuda/mps)? :( ")
 print(device)
 
 raw_inputs = [
