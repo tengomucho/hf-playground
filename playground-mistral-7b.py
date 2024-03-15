@@ -1,15 +1,21 @@
 from transformers import AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig
 import transformers
 import torch
+import os
+os.environ['PJRT_DEVICE'] = 'TPU'
+
+if 'CPU' in os.environ:
+    device = 'cpu'
+else:
+    try:
+        import torch_xla.core.xla_model as xm
+        device = 'xla'
+    except:
+        device = 'mps'
 
 # Resources:
 # https://huggingface.co/mistralai/Mistral-7B-Instruct-v0.1
 # I could have used the basic Mistral 7B, but this one seems easier to test out
-
-device = "cuda:0" if torch.cuda.is_available() else "cpu"
-if device == 'cpu':
-    raise RuntimeError("where's cuda? :( ")
-
 
 model_name = "mistralai/Mistral-7B-Instruct-v0.1"
 

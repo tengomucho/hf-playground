@@ -1,6 +1,17 @@
 from transformers import AutoTokenizer
 import transformers
 import torch
+import os
+os.environ['PJRT_DEVICE'] = 'TPU'
+
+if 'CPU' in os.environ:
+    device = 'cpu'
+else:
+    try:
+        import torch_xla.core.xla_model as xm
+        device = 'xla'
+    except:
+        device = 'mps'
 
 # You should login to hf for this:
 # huggingface-cli login
@@ -12,9 +23,6 @@ import torch
 # https://huggingface.co/meta-llama/Llama-2-7b-chat-hf
 #
 
-device = "cuda:0" if torch.cuda.is_available() else "cpu"
-if device == 'cpu':
-    raise RuntimeError("where's cuda? :( ")
 
 model = "huggingface/llama-7b"
 
