@@ -49,7 +49,7 @@ def conditional_compile(func):
             }
         else:
             compile_params = {
-                "backend": "openxla_eval",
+                "backend": "openxla",
                 # "mode":"reduce-overhead",
                 # "fullgraph": True
             }
