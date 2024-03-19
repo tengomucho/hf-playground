@@ -9,14 +9,35 @@ import time
 import datetime
 import os
 import platform
+from contextlib import contextmanager
 
 os.environ["PJRT_DEVICE"] = "TPU"
 
-if 'CPU' in os.environ:
-    device ="cpu"
+# This will allow ignoring profiling on unsupported platforms
+class DummyProfiler:
+    @contextmanager
+    def StepTrace(self, *args, **kwargs):
+        yield
+
+    @contextmanager
+    def Trace(self, *args, **kwargs):
+        yield
+
+    def start_server(self, int):
+        return
+
+    def trace_detached(self, *args, **kwargs):
+        return
+
+
+xp = DummyProfiler()
+if "CPU" in os.environ:
+    device = "cpu"
 else:
     try:
         import torch_xla.core.xla_model as xm
+        import torch_xla.debug.profiler as xp
+
         device = "xla"
     except ModuleNotFoundError:
         device = "mps"
@@ -28,15 +49,18 @@ def sample_greedy(logits):
     return next_token_id
 
 
-def decode_one_tokens(model, cur_token, input_pos, cache_position):
-    logits = model(
-        cur_token,
-        position_ids=input_pos,
-        cache_position=cache_position,
-        return_dict=False,
-        use_cache=True,
-    )[0]
-    new_token = sample_greedy(logits)
+def decode_one_tokens(model, cur_token, input_pos, cache_position, step):
+    with xp.StepTrace("decode_one_tokens", step_num=step):
+        with xp.Trace("inference"):
+            logits = model(
+                cur_token,
+                position_ids=input_pos,
+                cache_position=cache_position,
+                return_dict=False,
+                use_cache=True,
+            )[0]
+        with xp.Trace("sample_greedy"):
+            new_token = sample_greedy(logits)
     return new_token
 
 
@@ -78,7 +102,14 @@ batch_size, sequence_length = inputs["input_ids"].shape
 max_cache_length = 1024
 max_new_tokens = 20
 
-with torch.no_grad():
+profiler_port = 9874
+profile_logdir = "./logdir/"
+profile_duration_ms = 5000
+profile_step = 4
+
+
+def test_gemma(device, model):
+    server = xp.start_server(profiler_port)
 
     start = time.time()
     model._setup_cache(StaticCache, batch_size, max_cache_len=max_cache_length)
@@ -94,13 +125,17 @@ with torch.no_grad():
     generated_ids[:, cache_position] = inputs["input_ids"].to(torch.int)
 
     # prefill here
-    attention_mask = inputs['attention_mask']
+    attention_mask = inputs["attention_mask"]
     pos_ids = (attention_mask.cumsum(-1) - 1).masked_fill(attention_mask == 0, 0)
     logits = model(
-        **inputs, cache_position=cache_position, return_dict=False, use_cache=True, position_ids=pos_ids
+        **inputs,
+        cache_position=cache_position,
+        return_dict=False,
+        use_cache=True,
+        position_ids=pos_ids,
     )[0]
     next_token = sample_greedy(logits)
-    if device == 'xla':
+    if device == "xla":
         xm.mark_step()
     generated_ids[:, sequence_length] = next_token[:, 0]
     end = time.time()
@@ -113,8 +148,17 @@ with torch.no_grad():
     cache_position = torch.tensor([sequence_length + 1], device=device)
     start = time.time()
     for i in range(max_new_tokens):
+        if i == profile_step:
+            xp.trace_detached(
+                f"localhost:{profiler_port}",
+                profile_logdir,
+                duration_ms=profile_duration_ms,
+            )
+
         step_start = time.time()
-        next_token = decode_one_tokens(model, next_token.clone(), pos_ids, cache_position)
+        next_token = decode_one_tokens(
+            model, next_token.clone(), pos_ids, cache_position, i
+        )
         generated_ids[:, cache_position] = next_token
 
         cache_position += 1
@@ -126,7 +170,11 @@ with torch.no_grad():
         # print(f" token: {next_token} text: {tokenizer.batch_decode(next_token)}")
     end = time.time()
     print(f"Eval took {end - start} seconds.")
+    return generated_ids
 
+
+with torch.no_grad():
+    generated_ids = test_gemma(device, model)
 
 print(f"Getting data back {datetime.datetime.now()}")
 
@@ -135,4 +183,6 @@ for i, text in enumerate(decoded_texts):
     print(i, text)
 
 end = time.time()
-print(f"Program run in {end - prg_start} seconds. Device: {device} System: {platform.system()}")
+print(
+    f"Program run in {end - prg_start} seconds. Device: {device} System: {platform.system()}"
+)
