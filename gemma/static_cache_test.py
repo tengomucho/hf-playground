@@ -13,6 +13,7 @@ from contextlib import contextmanager
 
 os.environ["PJRT_DEVICE"] = "TPU"
 
+
 # This will allow ignoring profiling on unsupported platforms
 class DummyProfiler:
     @contextmanager
@@ -49,13 +50,16 @@ def sample_greedy(logits):
     return next_token_id
 
 
-def decode_one_tokens(model, cur_token, input_pos, cache_position, step):
+def decode_one_tokens(
+    model, cur_token, input_pos, cache_position, past_key_values, step
+):
     with xp.StepTrace("decode_one_tokens", step_num=step):
         with xp.Trace("inference"):
             logits = model(
                 cur_token,
                 position_ids=input_pos,
                 cache_position=cache_position,
+                past_key_values=past_key_values,
                 return_dict=False,
                 use_cache=True,
             )[0]
@@ -90,9 +94,10 @@ torch_dtype = torch.float16 if device == "mps" else torch.bfloat16
 model = AutoModelForCausalLM.from_pretrained(
     model_id, torch_dtype=torch_dtype, device_map=device
 )
-model = model.eval()
+tokenizer = AutoTokenizer.from_pretrained(
+    model_id, return_tensors="pt", padding_side="right"
+)
 
-tokenizer = AutoTokenizer.from_pretrained(model_id)
 # prompts = ["Here's a funny thing:", "This is a good recipe for a dessert:"]
 # # 4 prompts test, for a change
 # prompts = ["Here's a funny thing:", "This is a good recipe for a dessert:", "Give me one more chance", ""]
@@ -110,11 +115,13 @@ profile_step = 4
 
 def test_gemma(device, model):
     server = xp.start_server(profiler_port)
-
-    start = time.time()
-    model._setup_cache(StaticCache, batch_size, max_cache_len=max_cache_length)
-    end = time.time()
-    print(f"Model cache setup took {end - start} seconds.")
+    past_key_values = StaticCache(
+        config=model.config,
+        max_batch_size=2,
+        max_cache_len=max_cache_length,
+        device=model.device,
+        dtype=model.dtype,
+    )
     start = time.time()
     cache_position = torch.arange(sequence_length, device=device)
     generated_ids = torch.zeros(
@@ -133,6 +140,7 @@ def test_gemma(device, model):
         return_dict=False,
         use_cache=True,
         position_ids=pos_ids,
+        past_key_values=past_key_values,
     )[0]
     next_token = sample_greedy(logits)
     if device == "xla":
@@ -157,7 +165,7 @@ def test_gemma(device, model):
 
         step_start = time.time()
         next_token = decode_one_tokens(
-            model, next_token.clone(), pos_ids, cache_position, i
+            model, next_token.clone(), pos_ids, cache_position, past_key_values, i
         )
         generated_ids[:, cache_position] = next_token
 

@@ -73,11 +73,6 @@ max_cache_length = 1024
 max_new_tokens = 20
 
 with torch.no_grad():
-
-    start = time.time()
-    model._setup_cache(StaticCache, batch_size, max_cache_len=max_cache_length)
-    end = time.time()
-    print(f"Model cache setup took {end - start} seconds.")
     start = time.time()
     generated_ids = torch.zeros(
         (batch_size, sequence_length + max_new_tokens + 1),
