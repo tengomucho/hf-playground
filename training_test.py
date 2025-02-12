@@ -9,6 +9,15 @@ from huggingface_hub import HfFolder
 
 from transformers import TrainingArguments, Trainer
 
+"""
+To do a quick test, you can launch this with:
+
+python training_test.py \
+    --epochs=10 \
+    --max_steps=40 \
+    --per_device_train_batch_size 8 \
+    --train_max_length 64
+"""
 
 
 # Metric Id
