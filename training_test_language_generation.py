@@ -11,7 +11,7 @@ from transformers import TrainingArguments, Trainer, DataCollatorForLanguageMode
 """
 To do a quick test, you can launch this with:
 
-python training_tes_language_generation.py \
+python training_test_language_generation.py \
     --epochs=10 \
     --max_steps=40 \
     --per_device_train_batch_size 8 \
